@@ -115,15 +115,20 @@ function! s:neoformat(bang, user_input, start_line, end_line) abort
             let new_buffer = lines_before + stdout + lines_after
             if new_buffer !=# original_buffer
 
-                call s:deletelines(len(new_buffer), line('$'))
+                if !cmd.inplace
+                    call s:deletelines(len(new_buffer), line('$'))
 
-                call setline(1, new_buffer)
+                    call setline(1, new_buffer)
 
-                call add(formatters_changed, cmd.name)
+                    call add(formatters_changed, cmd.name)
+                endif
                 let endmsg = cmd.name . ' formatted buffer'
             else
 
                 let endmsg = 'no change necessary with ' . cmd.name
+            endif
+            if cmd.inplace
+                edit!
             endif
             if !neoformat#utils#var('neoformat_run_all_formatters')
                 return neoformat#utils#msg(endmsg)
@@ -234,10 +239,12 @@ function! s:generate_cmd(definition, filetype) abort
 
     let no_append = get(a:definition, 'no_append', 0)
     let using_stdin = get(a:definition, 'stdin', 0)
+    let using_inplace = get(a:definition, 'inplace', 0)
     let using_stderr = get(a:definition, 'stderr', 0)
+    let using_replace = get(a:definition, 'replace', 0) || using_inplace
     let stderr_log = ''
 
-    let filename = expand('%:t')
+    let filename = using_inplace ? expand('%') : expand('%:t')
 
     let tmp_dir = has('win32') ? expand('$TEMP/neoformat') :
                 \ exists('$TMPDIR') ? expand('$TMPDIR/neoformat') :
@@ -247,10 +254,10 @@ function! s:generate_cmd(definition, filetype) abort
         call mkdir(tmp_dir, 'p')
     endif
 
-    if get(a:definition, 'replace', 0)
+    if !using_replace
         let path = !using_stdin ? expand(tmp_dir . '/' . fnameescape(filename)) : ''
     else
-        let path = !using_stdin ? tempname() : ''
+        let path = !using_stdin ? using_inplace ? filename : tempname() : ''
     endif
 
     let inline_environment = get(a:definition, 'env', [])
@@ -277,7 +284,8 @@ function! s:generate_cmd(definition, filetype) abort
         \ 'stdin':     using_stdin,
         \ 'stderr_log': stderr_log,
         \ 'name':      a:definition.exe,
-        \ 'replace':   get(a:definition, 'replace', 0),
+        \ 'replace':   using_replace,
+        \ 'inplace':   using_inplace,
         \ 'tmp_file_path': path,
         \ 'valid_exit_codes': get(a:definition, 'valid_exit_codes', [0]),
         \ }
