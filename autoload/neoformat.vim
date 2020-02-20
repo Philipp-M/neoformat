@@ -141,6 +141,9 @@ function! s:neoformat(bang, user_input, start_line, end_line) abort
         endif
     endfor
     if len(formatters_failed) > 0
+        if cmd.inplace
+            edit!
+        endif
         call neoformat#utils#msg('formatters ' . join(formatters_failed, ", ") . ' failed to run')
     endif
     if len(formatters_changed) > 0
